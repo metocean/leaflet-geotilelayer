@@ -9,17 +9,28 @@ L.GeoTileLayer = L.GridLayer.extend({
   },
   initialize: function(url, options) {
     this._url = url;
-    this._tileCache = {};
-    return options = L.setOptions(this, options);
+    this._geoCache = {};
+    options = L.setOptions(this, options);
+    if (options.unload != null) {
+      return this.on('tileunload', function(e) {
+        var params, ref;
+        params = this._generateParams(e.coords);
+        return options.unload.call(this, e.tile, params, (ref = this._geoCache[params.url]) != null ? ref : null);
+      });
+    }
   },
-  createTile: function(coords, done) {
-    var geo, layer, params, requestparams, tile;
-    layer = this;
-    tile = document.createElement('span');
+  _update: function(center) {
+    if (this.options.update != null) {
+      this.options.update.call(this);
+    }
+    return L.GridLayer.prototype._update.call(this, center);
+  },
+  _generateParams: function(coords) {
+    var params, requestparams;
     params = {
       x: coords.x,
       y: coords.y,
-      z: this._tileZoom
+      z: coords.z
     };
     requestparams = {
       x: params.x,
@@ -33,9 +44,21 @@ L.GeoTileLayer = L.GridLayer.extend({
     }
     params.url = L.Util.template(this._url, requestparams);
     params.size = this.getTileSize();
-    if (this._tileCache[params.url] != null) {
-      geo = this._tileCache[params.url];
-      layer.options.render(tile, params, geo);
+    params.key = params.x + "," + params.y + "," + params.z;
+    return params;
+  },
+  createTile: function(coords, done) {
+    var geo, layer, params, tile;
+    params = this._generateParams({
+      x: coords.x,
+      y: coords.y,
+      z: this._tileZoom
+    });
+    layer = this;
+    tile = document.createElement('span');
+    if (this._geoCache[params.url] != null) {
+      geo = this._geoCache[params.url];
+      layer.options.render.call(this, tile, params, geo);
       setTimeout(function() {
         return done(null, tile);
       }, 1);
@@ -44,8 +67,8 @@ L.GeoTileLayer = L.GridLayer.extend({
         if (err != null) {
           return done(err, tile);
         }
-        layer._tileCache[params.url] = res.body;
-        layer.options.render(tile, params, res.body);
+        layer._geoCache[params.url] = res.body;
+        layer.options.render.call(layer, tile, params, res.body);
         return done(null, tile);
       });
     }

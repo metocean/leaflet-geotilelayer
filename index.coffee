@@ -5,17 +5,24 @@ L.GeoTileLayer = L.GridLayer.extend
 
   initialize: (url, options) ->
     @_url = url
-    @_tileCache = {}
+    @_geoCache = {}
     options = L.setOptions @, options
 
-  createTile: (coords, done) ->
-    layer = @
-    tile = document.createElement 'span'
+    if options.unload?
+      @on 'tileunload', (e) ->
+        params = @_generateParams e.coords
+        options.unload.call @, e.tile, params, @_geoCache[params.url] ? null
 
+  _update: (center) ->
+    if @options.update?
+      @options.update.call @
+    L.GridLayer.prototype._update.call @, center
+
+  _generateParams: (coords) ->
     params =
       x: coords.x
       y: coords.y
-      z: @_tileZoom
+      z: coords.z
 
     requestparams =
       x: params.x
@@ -30,10 +37,22 @@ L.GeoTileLayer = L.GridLayer.extend
 
     params.url = L.Util.template @_url, requestparams
     params.size = @getTileSize()
+    params.key = "#{params.x},#{params.y},#{params.z}"
 
-    if @_tileCache[params.url]?
-      geo = @_tileCache[params.url]
-      layer.options.render tile, params, geo
+    params
+
+  createTile: (coords, done) ->
+    params = @_generateParams
+      x: coords.x
+      y: coords.y
+      z: @_tileZoom
+
+    layer = @
+    tile = document.createElement 'span'
+
+    if @_geoCache[params.url]?
+      geo = @_geoCache[params.url]
+      layer.options.render.call @, tile, params, geo
       setTimeout ->
         done null, tile
       , 1
@@ -43,8 +62,8 @@ L.GeoTileLayer = L.GridLayer.extend
         .set 'Accept', 'application/json'
         .end (err, res) ->
           return done err, tile if err?
-          layer._tileCache[params.url] = res.body
-          layer.options.render tile, params, res.body
+          layer._geoCache[params.url] = res.body
+          layer.options.render.call layer, tile, params, res.body
           done null, tile
 
     tile
