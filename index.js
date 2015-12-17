@@ -9,15 +9,20 @@ L.GeoTileLayer = L.GridLayer.extend({
   },
   initialize: function(url, options) {
     this._url = url;
+    this._requests = {};
     this._geoCache = {};
     options = L.setOptions(this, options);
-    if (options.unload != null) {
-      return this.on('tileunload', function(e) {
-        var params, ref;
-        params = this._generateParams(e.coords);
+    return this.on('tileunload', function(e) {
+      var params, ref;
+      params = this._generateParams(e.coords);
+      if (this._requests[params.url] != null) {
+        this._requests[params.url].abort();
+        delete this._requests[params.url];
+      }
+      if (options.unload != null) {
         return options.unload.call(this, e.tile, params, (ref = this._geoCache[params.url]) != null ? ref : null);
-      });
-    }
+      }
+    });
   },
   _update: function(center) {
     if (this.options.update != null) {
@@ -63,7 +68,8 @@ L.GeoTileLayer = L.GridLayer.extend({
         return done(null, tile);
       }, 1);
     } else {
-      request.get(params.url).set('Accept', 'application/json').end(function(err, res) {
+      this._requests[params.url] = request.get(params.url).set('Accept', 'application/json').end(function(err, res) {
+        delete layer._requests[params.url];
         if (err != null) {
           return done(err, tile);
         }

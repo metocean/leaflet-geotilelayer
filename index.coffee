@@ -5,12 +5,16 @@ L.GeoTileLayer = L.GridLayer.extend
 
   initialize: (url, options) ->
     @_url = url
+    @_requests = {}
     @_geoCache = {}
     options = L.setOptions @, options
 
-    if options.unload?
-      @on 'tileunload', (e) ->
-        params = @_generateParams e.coords
+    @on 'tileunload', (e) ->
+      params = @_generateParams e.coords
+      if @_requests[params.url]?
+        @_requests[params.url].abort()
+        delete @_requests[params.url]
+      if options.unload?
         options.unload.call @, e.tile, params, @_geoCache[params.url] ? null
 
   _update: (center) ->
@@ -57,10 +61,11 @@ L.GeoTileLayer = L.GridLayer.extend
         done null, tile
       , 1
     else
-      request
+      @_requests[params.url] = request
         .get params.url
         .set 'Accept', 'application/json'
         .end (err, res) ->
+          delete layer._requests[params.url]
           return done err, tile if err?
           layer._geoCache[params.url] = res.body
           layer.options.render.call layer, tile, params, res.body
