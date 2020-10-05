@@ -17,6 +17,6 @@
   },
   "homepage": "https://github.com/metocean/leaflet-geotilelayer#readme",
   "dependencies": {
-    "superagent": "1.5.0"
+    "superagent": "6.1.0"
   }
 }
